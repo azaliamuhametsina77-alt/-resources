@@ -1,0 +1,1268 @@
+
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Шахты и ресурсы на востоке ДР Конго</title>
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.19.0/dist/maplibre-gl.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0a0a0b;
+      --panel: rgba(22, 22, 24, 0.88);
+      --panel-strong: rgba(18, 18, 20, 0.94);
+      --panel-border: rgba(255, 255, 255, 0.10);
+      --text: #edf5ff;
+      --muted: #9b9ea6;
+      --shadow: 0 20px 52px rgba(0, 0, 0, 0.35);
+      --radius: 18px;
+      --gold: #B08A57;
+      --threeT: #6F8FA6;
+      --other: #A05A5A;
+      --unknown: #7b7f88;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body, #app {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      font-family: "Montserrat", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    body { overflow: hidden; }
+
+    #map {
+      position: absolute;
+      inset: 0;
+    }
+
+    .maplibregl-ctrl-bottom-right,
+    .maplibregl-ctrl-bottom-left {
+      display: none;
+    }
+
+    .panel {
+      position: absolute;
+      z-index: 10;
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: var(--radius);
+      backdrop-filter: blur(14px);
+      box-shadow: var(--shadow);
+    }
+
+    .panel-top {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .panel-toggle {
+      appearance: none;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.06);
+      color: var(--text);
+      font: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      border-radius: 999px;
+      padding: 8px 12px;
+      cursor: pointer;
+      transition: background 0.2s ease, border-color 0.2s ease;
+    }
+
+    .panel-toggle:hover {
+      background: rgba(255,255,255,0.10);
+      border-color: rgba(255,255,255,0.18);
+    }
+
+    .panel-body { display: block; }
+
+    .info-panel {
+      top: 18px;
+      left: 18px;
+      width: min(430px, calc(100vw - 36px));
+      padding: 14px 16px 12px;
+    }
+
+    .attribution-panel {
+      top: 18px;
+      right: 18px;
+      width: min(430px, calc(100vw - 36px));
+      padding: 14px 16px 12px;
+    }
+
+    .info-panel.is-collapsed,
+    .attribution-panel.is-collapsed {
+      width: auto;
+      padding: 0;
+      background: transparent;
+      border: 0;
+      box-shadow: none;
+      backdrop-filter: none;
+    }
+
+    .info-panel.is-collapsed .panel-top,
+    .attribution-panel.is-collapsed .panel-top {
+      margin: 0;
+    }
+
+    .info-panel.is-collapsed .panel-body,
+    .attribution-panel.is-collapsed .panel-body {
+      display: none;
+    }
+
+    .info-copy,
+    .attrib-line {
+      font-size: 13px;
+      line-height: 1.58;
+      color: var(--text);
+      margin: 0;
+    }
+
+    .legend-block {
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .legend-title,
+    .attrib-heading,
+    .eyebrow,
+    .section-title,
+    .card-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12.5px;
+      line-height: 1.45;
+      color: var(--text);
+    }
+
+    .legend-item + .legend-item { margin-top: 9px; }
+
+    .legend-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 999px;
+      flex: 0 0 auto;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .legend-dot--gold { background: var(--gold); }
+    .legend-dot--3t { background: var(--threeT); }
+    .legend-dot--other { background: var(--other); }
+    .legend-dot--unknown { background: var(--unknown); }
+    .legend-dot--outline { background: transparent; border: 2px solid rgba(255,255,255,0.95); }
+
+    .attrib-section + .attrib-section {
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .hover-card {
+      right: 18px;
+      bottom: 18px;
+      width: min(470px, calc(100vw - 36px));
+      padding: 16px 18px;
+      background: var(--panel-strong);
+      max-height: calc(100vh - 36px);
+      overflow: auto;
+    }
+
+    .hover-card::-webkit-scrollbar {
+      width: 10px;
+    }
+
+    .hover-card::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.12);
+      border-radius: 999px;
+    }
+
+    .hover-card.is-empty .event-type {
+      opacity: 0.62;
+    }
+
+    .event-type {
+      font-size: 18px;
+      font-weight: 700;
+      line-height: 1.18;
+      color: #f6f8fb;
+    }
+
+    .event-type.muted {
+      color: rgba(246,248,251,0.72);
+    }
+
+    .card-badges {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 9px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1;
+      border: 1px solid rgba(255,255,255,0.12);
+    }
+
+    .badge--gold { background: rgba(176,138,87,0.15); color: #f1ddbb; border-color: rgba(176,138,87,0.28); }
+    .badge--3t { background: rgba(111,143,166,0.15); color: #d8e6f1; border-color: rgba(111,143,166,0.28); }
+    .badge--other { background: rgba(160,90,90,0.15); color: #efd2d2; border-color: rgba(160,90,90,0.28); }
+    .badge--control { background: rgba(255,255,255,0.08); color: var(--text); }
+
+    .meta-list {
+      margin-top: 14px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .meta-row {
+      display: grid;
+      grid-template-columns: 132px 1fr;
+      gap: 12px;
+    }
+
+    .meta-label {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .meta-value {
+      font-size: 13px;
+      color: var(--text);
+      line-height: 1.45;
+    }
+
+    .section {
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .actor-card {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .actor-name {
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.35;
+      color: #f6f8fb;
+      margin-bottom: 6px;
+    }
+
+    .actor-meta {
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--text);
+    }
+
+    .actor-actions {
+      margin-top: 8px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .actor-chip {
+      padding: 5px 8px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.10);
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .card-note {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+      font-size: 12.5px;
+      line-height: 1.5;
+      color: var(--muted);
+    }
+
+    .status {
+      position: absolute;
+      left: 18px;
+      bottom: 18px;
+      z-index: 12;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: rgba(0,0,0,0.58);
+      border: 1px solid rgba(255,255,255,0.10);
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 700;
+      box-shadow: var(--shadow);
+    }
+
+    .status.is-hidden { display: none; }
+
+    @media (max-width: 980px) {
+      .attribution-panel {
+        top: auto;
+        bottom: 18px;
+        left: 18px;
+        right: auto;
+        width: min(440px, calc(100vw - 36px));
+      }
+
+      .status {
+        bottom: 150px;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .info-panel,
+      .attribution-panel,
+      .hover-card {
+        width: calc(100vw - 24px);
+      }
+
+      .info-panel {
+        top: 12px;
+        left: 12px;
+      }
+
+      .attribution-panel {
+        left: 12px;
+        right: 12px;
+        bottom: 12px;
+        width: calc(100vw - 24px);
+      }
+
+      .hover-card {
+        right: 12px;
+        left: 12px;
+        bottom: 12px;
+      }
+
+      .meta-row {
+        grid-template-columns: 1fr;
+        gap: 4px;
+      }
+
+      .status {
+        left: 12px;
+        bottom: 180px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="map"></div>
+
+    <aside id="infoPanel" class="panel info-panel" aria-label="Описание карты">
+      <div class="panel-top">
+        <button id="infoToggle" class="panel-toggle" type="button" aria-expanded="true">Скрыть</button>
+      </div>
+      <div id="infoPanelBody" class="panel-body">
+        <div class="info-copy">
+          Карта основана на полевых визитах IPIS по кустарным и мелкомасштабным шахтам на востоке ДР Конго.
+          <br><br>
+          Цвет точки показывает, что в основном добывается на объекте: золото, 3T-минералы (касситерит, колтан, вольфрамит) или другие ресурсы. Размер точки отражает ориентировочное число работников.
+          <br><br>
+          Белая обводка отмечает объекты, где в базе зафиксировано вмешательство или формы контроля со стороны вооружённых или силовых акторов. Это не равно «суверенному контролю территории»: речь идёт именно о присутствии, вмешательстве и практиках извлечения ренты на конкретном объекте.
+        </div>
+
+        <div class="legend-block">
+          <div class="legend-title">Тип добычи</div>
+          <div class="legend-item">
+            <span class="legend-dot legend-dot--gold"></span>
+            <span>Золото</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-dot legend-dot--3t"></span>
+            <span>3T-минералы: касситерит, колтан, вольфрамит</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-dot legend-dot--other"></span>
+            <span>Другие минералы</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-dot legend-dot--unknown"></span>
+            <span>Тип ресурса не указан</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-dot legend-dot--outline"></span>
+            <span>Зафиксировано вмешательство / контроль</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    
+
+    <aside id="hoverCard" class="panel hover-card is-empty" aria-live="polite">
+      <div id="hoverCardBody">
+        <div class="eyebrow">Наведите или нажмите на точку</div>
+        <div class="event-type muted">Данные о шахте появятся здесь</div>
+      </div>
+    </aside>
+
+    <div id="status" class="status">Загрузка данных…</div>
+  </div>
+
+  <script src="https://unpkg.com/maplibre-gl@5.19.0/dist/maplibre-gl.js"></script>
+  <script>
+    const DATA_FILE = './cod_mines_curated_all_opendata_p_ipis.geojson';
+
+    const COLORS = {
+      gold: '#B08A57',
+      threeT: '#6F8FA6',
+      other: '#A05A5A',
+      unknown: '#7b7f88'
+    };
+
+    const PROVINCE_RU = {
+      'Sud-Kivu': 'Южное Киву',
+      'Nord-Kivu': 'Северное Киву',
+      'Ituri': 'Итури',
+      'Maniema': 'Маниема',
+      'Tanganyika': 'Танганьика',
+      'Haut-Lomami': 'Верхнее Ломами',
+      'Tshopo': 'Чопо',
+      'Haut-Katanga': 'Верхняя Катанга',
+      'Haut-Uele': 'Верхнее Уэле',
+      'Lualaba': 'Луалаба',
+      'Kasaï-Oriental': 'Восточное Касаи',
+      'Bas-Uele': 'Нижнее Уэле'
+    };
+
+    const MINERAL_RU = {
+      'Or': 'золото',
+      'Cassitérite': 'касситерит',
+      'Coltan': 'колтан',
+      'Wolframite': 'вольфрамит',
+      'Cuivre': 'медь',
+      'Diamant': 'алмазы',
+      'Cobalt': 'кобальт',
+      'Tourmaline': 'турмалин',
+      'Manganèse': 'марганец',
+      'Monazite': 'монацит',
+      'Améthyste': 'аметист',
+      'Manvenve': 'манвенве',
+      'Pyrochlore': 'пирохлор',
+      'Saphir': 'сапфир',
+      'Minerais mixtes (Cassitérite/Coltan)': 'смешанные руды (касситерит / колтан)',
+      'inconnu': 'не указано',
+      'Argent': 'серебро',
+      'Bauxite': 'бокситы',
+      'Charbon': 'уголь',
+      'Digénite': 'дигенит',
+      'Fer': 'железо',
+      'Galene': 'галенит',
+      'Plomb': 'свинец',
+      'Quartz': 'кварц',
+      'Titanium': 'титан',
+      'Zircon': 'циркон',
+      'Arsénopyrite': 'арсенопирит',
+      'Niobium': 'ниобий'
+    };
+
+    const CONTROL_TYPE_RU = {
+      'Aucun': 'не указано',
+      'FARDC - Éléments indisciplinés': 'ВС ДР Конго (FARDC) — недисциплинированные элементы',
+      'FARDC - Pas d’ingérence constatée': 'ВС ДР Конго (FARDC) — вмешательство не зафиксировано',
+      'FARDC - Pas de données sur les ingérences': 'ВС ДР Конго (FARDC) — данных о вмешательстве нет',
+      'Groupe armé local': 'местная вооружённая группа',
+      'Groupe armé étranger': 'иностранная вооружённая группа',
+      'PMH - Éléments indisciplinés': 'горная полиция (PMH) — недисциплинированные элементы',
+      'PNC - Pas d’ingérence constatée': 'национальная полиция Конго (PNC) — вмешательство не зафиксировано',
+      'PNC - Éléments indisciplinés': 'национальная полиция Конго (PNC) — недисциплинированные элементы'
+    };
+
+    const SERVICE_RU = {
+      'SAESSCAM': 'SAESSCAM',
+      'iTSCi (via SAESSCAM)': 'iTSCi (через SAESSCAM)',
+      'Division des mines': 'горное ведомство',
+      'SAEMAPE': 'SAEMAPE',
+      'Chefferie': 'традиционная власть / шефферия',
+      'ANR': 'Национальное агентство разведки (ANR)',
+      'Afridex': 'Afridex',
+      'Autorités': 'местные власти',
+      'DGRPI': 'DGRPI',
+      'Administration': 'администрация',
+      'Police des Mines': 'горная полиция',
+      'FFN': 'FFN',
+      'PMH': 'горная полиция (PMH)',
+      'Police': 'полиция',
+      'SNPERI': 'SNPERI',
+      'SAKIMA': 'SAKIMA',
+      'Village': 'деревенская власть',
+      'Anti-fraude': 'антифрод / анти-контрабандный контроль',
+      'Localité': 'местный уровень',
+      'Chefferie ou secteur': 'шефферия или сектор'
+    };
+
+    const TRACEABILITY_RU = {
+      'iTSCI': 'iTSCI',
+      'iTSCI (not visited by IPIS)': 'iTSCI (объект не посещался IPIS)',
+      'Better Mining (BSP)': 'Better Mining (BSP)',
+      'ITOA': 'ITOA'
+    };
+
+    const QUALIFICATION_RU = {
+      'Vert': 'зелёная',
+      'Jaune': 'жёлтая',
+      'Rouge': 'красная',
+      'Bleu': 'синяя',
+      'No class': 'класс не указан',
+      'Not class': 'класс не указан'
+    };
+
+    const MECH_RU = {
+      'Bas': 'низкий',
+      'Moyen': 'средний',
+      'Haut': 'высокий'
+    };
+
+    const ACCESS_RU = {
+      'carmoto': 'доступ на машине / мотоцикле',
+      'less2h': 'менее 2 часов пути',
+      'more2h': 'более 2 часов пути'
+    };
+
+    const COUNTRY_LABELS = [
+      { name: 'ДР Конго', coordinates: [23.8, -3.0] },
+      { name: 'Руанда', coordinates: [29.95, -1.95] },
+      { name: 'Бурунди', coordinates: [30.05, -3.45] },
+      { name: 'Уганда', coordinates: [31.0, 0.9] },
+      { name: 'Южный Судан', coordinates: [29.1, 4.5] },
+      { name: 'Танзания', coordinates: [30.7, -6.5] },
+      { name: 'Замбия', coordinates: [27.4, -10.6] },
+      { name: 'Ангола', coordinates: [20.5, -10.2] }
+    ];
+
+    const state = {
+      lockedId: null,
+      hoverId: null,
+      featureById: new Map()
+    };
+
+    const hoverCard = document.getElementById('hoverCard');
+    const hoverCardBody = document.getElementById('hoverCardBody');
+    const statusEl = document.getElementById('status');
+    const infoPanel = document.getElementById('infoPanel');
+    const infoToggle = document.getElementById('infoToggle');
+
+    let map;
+
+    function setStatus(message, hide = false) {
+      statusEl.textContent = message;
+      statusEl.classList.toggle('is-hidden', hide);
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+    }
+
+    function formatNumber(value) {
+      const num = Number(value);
+      if (!Number.isFinite(num)) return 'не указано';
+      return new Intl.NumberFormat('ru-RU').format(num);
+    }
+
+    function isTruthy(value) {
+      return ['1', '1.0', 1, 1.0, true, 'true', 'True'].includes(value);
+    }
+
+    function firstNonEmpty(...values) {
+      for (const value of values) {
+        if (value !== null && value !== undefined && String(value).trim() !== '') return value;
+      }
+      return '';
+    }
+
+    function translateProvince(value) {
+      return PROVINCE_RU[value] || value || 'не указано';
+    }
+
+    function translateMineral(value) {
+      return MINERAL_RU[value] || (value ? value.toLowerCase() : '');
+    }
+
+    function translateType(value) {
+      return CONTROL_TYPE_RU[value] || value || '';
+    }
+
+    function translateService(value) {
+      return SERVICE_RU[value] || value || '';
+    }
+
+    function translateTraceability(value) {
+      return TRACEABILITY_RU[value] || value || '';
+    }
+
+    function translateQualification(value) {
+      return QUALIFICATION_RU[value] || value || '';
+    }
+
+    function translateMechanisation(value) {
+      return MECH_RU[value] || value || '';
+    }
+
+    function translateAccess(value) {
+      return ACCESS_RU[value] || value || '';
+    }
+
+    function normalizeGroupName(value) {
+      const raw = String(value || '').trim();
+      if (!raw || raw === 'Aucun') return '';
+      const map = {
+        'FARDC': 'Вооружённые силы ДР Конго (FARDC)',
+        'Police Nationale Congolaise (sauf PMH)': 'Национальная полиция Конго (PNC)',
+        'Police des Mines (PMH)': 'Горная полиция (PMH)'
+      };
+      return map[raw] || raw;
+    }
+
+    function formatDate(value) {
+      const raw = String(value || '').trim();
+      if (!raw) return 'не указано';
+      const clean = raw.replace(/Z$/, '');
+      const date = new Date(clean);
+      if (Number.isNaN(date.getTime())) return raw;
+      return new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(date);
+    }
+
+    function getMineralCategory(props) {
+      const primary = String(props.mineral1 || '').trim();
+      if (primary === 'Or' || isTruthy(props.is_gold_mine)) return 'gold';
+      if (['Cassitérite', 'Coltan', 'Wolframite', 'Minerais mixtes (Cassitérite/Coltan)'].includes(primary) || isTruthy(props.is_3t_mine)) return 'threeT';
+      if (primary && primary !== 'inconnu') return 'other';
+      return 'unknown';
+    }
+
+    function categoryLabel(category) {
+      return {
+        gold: 'золото',
+        threeT: '3T-минералы',
+        other: 'другие минералы',
+        unknown: 'тип ресурса не указан'
+      }[category] || 'тип ресурса не указан';
+    }
+
+    function circleRadiusExpression() {
+      return [
+        'interpolate',
+        ['linear'],
+        ['sqrt', ['max', ['to-number', ['coalesce', ['get', 'workers_numb'], 0]], 0]],
+        0, 4,
+        5, 5,
+        10, 6.2,
+        20, 8,
+        30, 10,
+        45, 12.5,
+        100, 18
+      ];
+    }
+
+    function highlightRadiusExpression() {
+      return [
+        'interpolate',
+        ['linear'],
+        ['sqrt', ['max', ['to-number', ['coalesce', ['get', 'workers_numb'], 0]], 0]],
+        0, 9,
+        5, 10,
+        10, 12,
+        20, 14,
+        30, 17,
+        45, 20,
+        100, 28
+      ];
+    }
+
+    function buildBounds(geojson) {
+      const bounds = new maplibregl.LngLatBounds();
+      geojson.features.forEach((feature) => {
+        const [lng, lat] = feature.geometry.coordinates;
+        bounds.extend([lng, lat]);
+      });
+      return bounds;
+    }
+
+    function pointFeature(lng, lat, props) {
+      return {
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [lng, lat] },
+        properties: props
+      };
+    }
+
+    function buildProvinceLabels(geojson) {
+      const buckets = new Map();
+      geojson.features.forEach((feature) => {
+        const props = feature.properties || {};
+        const province = String(props.province || '').trim();
+        if (!province) return;
+        const [lng, lat] = feature.geometry.coordinates;
+        if (!buckets.has(province)) buckets.set(province, []);
+        buckets.get(province).push([Number(lng), Number(lat)]);
+      });
+
+      const features = [];
+      for (const [province, coords] of buckets.entries()) {
+        const lng = coords.reduce((sum, item) => sum + item[0], 0) / coords.length;
+        const lat = coords.reduce((sum, item) => sum + item[1], 0) / coords.length;
+        features.push(pointFeature(lng, lat, { label_ru: translateProvince(province) }));
+      }
+
+      return { type: 'FeatureCollection', features };
+    }
+
+    function buildCountryLabels() {
+      return {
+        type: 'FeatureCollection',
+        features: COUNTRY_LABELS.map(item => pointFeature(item.coordinates[0], item.coordinates[1], { label_ru: item.name }))
+      };
+    }
+
+    function addBaseSourcesAndLayers() {
+      map.addSource('carto-dark', {
+        type: 'raster',
+        tiles: [
+          'https://a.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png',
+          'https://b.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png',
+          'https://c.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png',
+          'https://d.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png'
+        ],
+        tileSize: 256,
+        attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+      });
+
+      map.addLayer({
+        id: 'carto-dark-layer',
+        type: 'raster',
+        source: 'carto-dark',
+        paint: {
+          'raster-opacity': 0.42,
+          'raster-saturation': -0.72,
+          'raster-contrast': -0.08
+        }
+      });
+    }
+
+    function addDataSources(geojson, provinceLabels, countryLabels) {
+      map.addSource('mines', {
+        type: 'geojson',
+        data: geojson,
+        promoteId: 'vid'
+      });
+
+      map.addSource('active-mine', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] }
+      });
+
+      map.addSource('province-labels', {
+        type: 'geojson',
+        data: provinceLabels
+      });
+
+      map.addSource('country-labels', {
+        type: 'geojson',
+        data: countryLabels
+      });
+    }
+
+    function addLayers() {
+      map.addLayer({
+        id: 'mine-points',
+        type: 'circle',
+        source: 'mines',
+        paint: {
+          'circle-color': [
+            'match',
+            ['get', 'mineral_category'],
+            'gold', COLORS.gold,
+            'threeT', COLORS.threeT,
+            'other', COLORS.other,
+            COLORS.unknown
+          ],
+          'circle-radius': circleRadiusExpression(),
+          'circle-opacity': 0.86,
+          'circle-stroke-color': [
+            'case',
+            ['==', ['get', 'has_interference'], 1], 'rgba(248,248,249,0.95)',
+            'rgba(10,10,11,0.96)'
+          ],
+          'circle-stroke-width': [
+            'case',
+            ['==', ['get', 'has_interference'], 1], 1.45,
+            0.9
+          ]
+        }
+      });
+
+      map.addLayer({
+        id: 'active-mine-layer',
+        type: 'circle',
+        source: 'active-mine',
+        paint: {
+          'circle-color': [
+            'match',
+            ['get', 'mineral_category'],
+            'gold', COLORS.gold,
+            'threeT', COLORS.threeT,
+            'other', COLORS.other,
+            COLORS.unknown
+          ],
+          'circle-opacity': 0.18,
+          'circle-radius': highlightRadiusExpression(),
+          'circle-stroke-color': '#ffffff',
+          'circle-stroke-width': 2.5
+        }
+      });
+
+      map.addLayer({
+        id: 'province-labels-layer',
+        type: 'symbol',
+        source: 'province-labels',
+        minzoom: 5.2,
+        layout: {
+          'text-field': ['get', 'label_ru'],
+          'text-font': ['Open Sans Semibold'],
+          'text-size': ['interpolate', ['linear'], ['zoom'], 5.2, 11, 7.5, 13],
+          'text-max-width': 7,
+          'text-allow-overlap': false,
+          'text-ignore-placement': false
+        },
+        paint: {
+          'text-color': 'rgba(205,212,220,0.42)',
+          'text-halo-color': 'rgba(10,10,11,0.92)',
+          'text-halo-width': 1.25
+        }
+      });
+
+      map.addLayer({
+        id: 'country-labels-layer',
+        type: 'symbol',
+        source: 'country-labels',
+        layout: {
+          'text-field': ['get', 'label_ru'],
+          'text-font': ['Open Sans Semibold'],
+          'text-size': ['interpolate', ['linear'], ['zoom'], 4, 10, 6, 12.5],
+          'text-max-width': 8,
+          'text-allow-overlap': false,
+          'text-ignore-placement': false
+        },
+        paint: {
+          'text-color': 'rgba(168,176,187,0.58)',
+          'text-halo-color': 'rgba(10,10,11,0.86)',
+          'text-halo-width': 1.2
+        }
+      });
+    }
+
+    function installPanelToggles() {
+      infoToggle.addEventListener('click', () => {
+        const collapsed = infoPanel.classList.toggle('is-collapsed');
+        infoToggle.textContent = collapsed ? 'Показать' : 'Скрыть';
+        infoToggle.setAttribute('aria-expanded', String(!collapsed));
+      });
+
+    }
+
+    function featureAtPoint(point) {
+      return map.queryRenderedFeatures(point, { layers: ['mine-points'] })[0] || null;
+    }
+
+    function setActiveFeature(feature) {
+      const fc = feature
+        ? { type: 'FeatureCollection', features: [feature] }
+        : { type: 'FeatureCollection', features: [] };
+      map.getSource('active-mine').setData(fc);
+    }
+
+    function metaRow(label, value) {
+      if (!value) return '';
+      return `
+        <div class="meta-row">
+          <div class="meta-label">${escapeHtml(label)}</div>
+          <div class="meta-value">${escapeHtml(value)}</div>
+        </div>
+      `;
+    }
+
+    function renderEmptyCard() {
+      hoverCard.classList.add('is-empty');
+      hoverCardBody.innerHTML = `
+        <div class="eyebrow">Наведите или нажмите на точку</div>
+        <div class="event-type muted">Данные о шахте появятся здесь</div>
+      `;
+    }
+
+    function uniqueMinerals(props) {
+      const values = [props.mineral1, props.mineral2, props.mineral3]
+        .map(value => String(value || '').trim())
+        .filter(Boolean)
+        .filter(value => value !== 'inconnu');
+      return [...new Set(values)].map(translateMineral);
+    }
+
+    function boolLabel(value) {
+      return isTruthy(value) ? 'да' : 'нет';
+    }
+
+    function buildAccess(props) {
+      const dry = translateAccess(props.access_dry);
+      const wet = translateAccess(props.access_wet);
+      if (!dry && !wet) return '';
+      const items = [];
+      if (dry) items.push(`сухой сезон: ${dry}`);
+      if (wet) items.push(`сезон дождей: ${wet}`);
+      return items.join(' · ');
+    }
+
+    function buildServices(props) {
+      return [props.state_service1, props.state_service2, props.state_service3, props.state_service4]
+        .map(translateService)
+        .filter(Boolean);
+    }
+
+    function buildControlActions(props, index) {
+      const postfix = `_armed_group${index}`;
+      const actions = [];
+      if (isTruthy(props[`taxation${postfix}`])) actions.push('налогообложение');
+      if (isTruthy(props[`commerce_taxation${postfix}`])) actions.push('сборы с торговли');
+      if (isTruthy(props[`entrance_taxation${postfix}`])) actions.push('плата за вход');
+      if (isTruthy(props[`monopoly${postfix}`])) actions.push('монополия');
+      if (isTruthy(props[`buying_minerals${postfix}`])) actions.push('покупка минералов');
+      if (isTruthy(props[`digging${postfix}`])) actions.push('добыча / копка');
+      if (isTruthy(props[`forced_labour${postfix}`])) actions.push('принудительный труд');
+      if (isTruthy(props[`pillaging${postfix}`])) actions.push('мародёрство');
+      if (String(props[`pit_ownership${postfix}`]).trim() === '1') actions.push('владение шахтой');
+      return actions;
+    }
+
+    function translateFrequency(value) {
+      const map = {
+        'Permanent': 'постоянно',
+        'Permanente': 'постоянно',
+        'Quotidien': 'ежедневно',
+        'Chaque semaine': 'каждую неделю',
+        'Hebdomadaire': 'еженедельно',
+        'Une fois par semaine': 'раз в неделю',
+        'Une fois tous les 15 jours': 'раз в две недели',
+        'Plus d\'une fois par semaine': 'чаще одного раза в неделю',
+        'Une fois par mois': 'раз в месяц',
+        'Moins d\'une fois par mois': 'реже раза в месяц',
+        'Irrégulière': 'нерегулярно',
+        'Irregulière': 'нерегулярно',
+        'Aléatoire': 'случайным образом',
+        'Occasionnelle': 'время от времени',
+        'Occasionelle': 'время от времени',
+        'Régulière': 'регулярно',
+        'Lors de patrouilles': 'во время патрулей',
+        'Pas': 'не указано'
+      };
+      return map[value] || value || '';
+    }
+
+    function buildActorCards(props) {
+      const cards = [];
+      for (let i = 1; i <= 3; i += 1) {
+        const name = normalizeGroupName(props[`armed_group${i}`]);
+        const type = translateType(props[`type_armed_group${i}`]);
+        const frequency = translateFrequency(props[`frequency_armed_group${i}`]);
+        const actions = buildControlActions(props, i);
+
+        if (!name && !type && actions.length === 0) continue;
+        if (name === '' && type === 'не указано' && actions.length === 0) continue;
+
+        const meta = [];
+        if (type && type !== 'не указано') meta.push(type);
+        if (frequency) meta.push(`частота: ${frequency}`);
+
+        cards.push(`
+          <div class="actor-card">
+            <div class="actor-name">${escapeHtml(name || 'Актор не указан')}</div>
+            ${meta.length ? `<div class="actor-meta">${escapeHtml(meta.join(' · '))}</div>` : ''}
+            ${actions.length ? `<div class="actor-actions">${actions.map(action => `<span class="actor-chip">${escapeHtml(action)}</span>`).join('')}</div>` : ''}
+          </div>
+        `);
+      }
+      return cards.join('');
+    }
+
+    function buildControlSummary(props) {
+      const hasPresence = isTruthy(props.presence);
+      const hasInterference = isTruthy(props.interference);
+
+      if (hasInterference) {
+        return 'Зафиксировано вмешательство или практики контроля со стороны вооружённых / силовых акторов.';
+      }
+      if (hasPresence) {
+        return 'Присутствие вооружённых или силовых акторов зафиксировано, но прямое вмешательство не отмечено.';
+      }
+      return 'Присутствие вооружённых или силовых акторов на объекте не зафиксировано.';
+    }
+
+    function renderFeatureCard(feature, locked = false) {
+      if (!feature) {
+        renderEmptyCard();
+        return;
+      }
+
+      const props = feature.properties || {};
+      hoverCard.classList.remove('is-empty');
+
+      const minerals = uniqueMinerals(props);
+      const services = buildServices(props);
+      const access = buildAccess(props);
+      const category = props.mineral_category || getMineralCategory(props);
+
+      const location = [
+        translateProvince(props.province),
+        firstNonEmpty(props.territoire),
+        firstNonEmpty(props.collectivite),
+        firstNonEmpty(props.groupement),
+        firstNonEmpty(props.village)
+      ].filter(Boolean).join(' · ');
+
+      const badges = [
+        `<span class="badge badge--${category === 'gold' ? 'gold' : category === 'threeT' ? '3t' : 'other'}">${escapeHtml(categoryLabel(category))}</span>`,
+        isTruthy(props.has_interference) ? '<span class="badge badge--control">есть вмешательство</span>' : ''
+      ].filter(Boolean).join('');
+
+      const salesRows = [1, 2, 3].map((idx) => {
+        const mineral = String(props[`mineral${idx}`] || '').trim();
+        if (!mineral || mineral === 'inconnu') return '';
+        const sell = String(props[`selling_points_mineral${idx}`] || '').trim();
+        const dest = String(props[`final_destination_mineral${idx}`] || '').trim();
+        if (!sell && !dest) return '';
+        return `
+          ${sell ? metaRow(`Сбыт: ${translateMineral(mineral)}`, sell) : ''}
+          ${dest ? metaRow(`Направление: ${translateMineral(mineral)}`, dest) : ''}
+        `;
+      }).join('');
+
+      const note = `
+        <div class="card-note">
+          База фиксирует присутствие и вмешательство акторов на конкретной шахте, а не полный военный контроль над всей окружающей территорией.
+        </div>
+      `;
+
+      hoverCardBody.innerHTML = `
+        <div class="eyebrow">${locked ? 'Объект выбран' : 'Наведите или нажмите на точку'}</div>
+        <div class="event-type">${escapeHtml(props.name || 'Шахта без названия')}</div>
+        ${badges ? `<div class="card-badges">${badges}</div>` : ''}
+
+        <div class="meta-list">
+          ${metaRow('Тип объекта', 'шахта / добывающий объект')}
+          ${metaRow('Локация', location)}
+          ${metaRow('Дата визита', formatDate(props.visit_date))}
+          ${metaRow('Что добывается', minerals.length ? minerals.join(', ') : 'не указано')}
+          ${metaRow('Работников', Number.isFinite(Number(props.workers_numb)) ? formatNumber(props.workers_numb) : 'не указано')}
+          ${access ? metaRow('Доступ', access) : ''}
+          ${metaRow('Трейсабилити', translateTraceability(props.traceability))}
+          ${metaRow('Классификация', translateQualification(props.qualification))}
+          ${metaRow('Механизация', translateMechanisation(props.mechanisation))}
+        </div>
+
+        ${salesRows ? `<div class="section">
+          <div class="section-title">Сбыт и направления</div>
+          <div class="meta-list">${salesRows}</div>
+        </div>` : ''}
+
+        <div class="section">
+          <div class="section-title">Контроль и вооружённые акторы</div>
+          <div class="meta-list">
+            ${metaRow('Присутствие', boolLabel(props.presence))}
+            ${metaRow('Вмешательство', boolLabel(props.interference))}
+            ${metaRow('Кратко', buildControlSummary(props))}
+          </div>
+          ${buildActorCards(props) || `<div class="meta-value">Подробные акторы не указаны.</div>`}
+        </div>
+
+        ${services.length ? `<div class="section">
+          <div class="section-title">Госслужбы и официальные структуры</div>
+          <div class="meta-list">
+            ${metaRow('Зафиксированы', services.join(', '))}
+          </div>
+        </div>` : ''}
+
+        <div class="section">
+          <div class="section-title">Социальные и экологические индикаторы</div>
+          <div class="meta-list">
+            ${metaRow('Визит на месте', boolLabel(props.visit_onsite))}
+            ${metaRow('Причина без выезда', String(props.visit_onsite_novisitreason || '').trim())}
+            ${metaRow('Есть женщины на объекте', boolLabel(props.women))}
+            ${metaRow('Работа женщин описана', String(props.womenwork || '').trim() ? 'да' : 'нет')}
+            ${metaRow('Описание работы женщин', String(props.womenwork || '').trim())}
+            ${metaRow('Есть дети до 15 лет', boolLabel(props.childunder15))}
+            ${metaRow('Работа детей описана', String(props.childunder15work || '').trim() ? 'да' : 'нет')}
+            ${metaRow('Описание работы детей', String(props.childunder15work || '').trim())}
+            ${metaRow('Используется ртуть', boolLabel(props.mercury))}
+          </div>
+        </div>
+
+        ${note}
+      `;
+    }
+
+    function updateActiveFromId(id) {
+      const feature = id ? state.featureById.get(id) : null;
+      setActiveFeature(feature || null);
+      renderFeatureCard(feature || null, Boolean(state.lockedId));
+    }
+
+    function setHover(id) {
+      if (state.hoverId === id) return;
+      state.hoverId = id;
+      updateActiveFromId(state.lockedId || state.hoverId);
+    }
+
+    function clearHover() {
+      if (state.hoverId === null) return;
+      state.hoverId = null;
+      updateActiveFromId(state.lockedId || null);
+    }
+
+    function setLocked(id) {
+      state.lockedId = id;
+      updateActiveFromId(id);
+    }
+
+    function clearLocked() {
+      if (state.lockedId === null) return;
+      state.lockedId = null;
+      updateActiveFromId(state.hoverId || null);
+    }
+
+    function installInteractions() {
+      map.on('mousemove', 'mine-points', (e) => {
+        map.getCanvas().style.cursor = 'pointer';
+        if (state.lockedId) return;
+        const feature = e.features && e.features[0];
+        if (feature) setHover(feature.properties.vid);
+      });
+
+      map.on('mouseleave', 'mine-points', () => {
+        map.getCanvas().style.cursor = '';
+        if (state.lockedId) return;
+        clearHover();
+      });
+
+      map.on('click', (e) => {
+        const feature = featureAtPoint(e.point);
+        if (feature) {
+          setLocked(feature.properties.vid);
+          map.getCanvas().style.cursor = 'pointer';
+        } else {
+          clearLocked();
+          clearHover();
+          map.getCanvas().style.cursor = '';
+        }
+      });
+    }
+
+    function createMap() {
+      map = new maplibregl.Map({
+        container: 'map',
+        style: {
+          version: 8,
+          glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+          sources: {},
+          layers: [
+            { id: 'background', type: 'background', paint: { 'background-color': '#0a0a0b' } }
+          ]
+        },
+        attributionControl: false,
+        dragRotate: false,
+        pitchWithRotate: false,
+        touchZoomRotate: true,
+        maxPitch: 0
+      });
+    }
+
+    async function init() {
+      setStatus('Загрузка данных…');
+
+      const response = await fetch(DATA_FILE);
+      if (!response.ok) throw new Error(`Не удалось загрузить ${DATA_FILE}`);
+      const geojson = await response.json();
+
+      geojson.features.forEach((feature) => {
+        const props = feature.properties || {};
+        const featureId = props.vid;
+        props.vid = featureId;
+        props.mineral_category = getMineralCategory(props);
+        props.has_interference = isTruthy(props.interference) ? 1 : 0;
+        state.featureById.set(featureId, feature);
+      });
+
+      const provinceLabels = buildProvinceLabels(geojson);
+      const countryLabels = buildCountryLabels();
+
+      createMap();
+      installPanelToggles();
+
+      map.on('load', () => {
+        addBaseSourcesAndLayers();
+        addDataSources(geojson, provinceLabels, countryLabels);
+        addLayers();
+        installInteractions();
+
+        const bounds = buildBounds(geojson);
+        bounds.extend([20.2, -12.5]);
+        bounds.extend([31.8, 5.0]);
+
+        map.fitBounds(bounds, {
+          padding: { top: 70, right: 70, bottom: 70, left: 70 },
+          duration: 0,
+          maxZoom: 6.2
+        });
+
+        renderEmptyCard();
+        setStatus('Готово', true);
+      });
+    }
+
+    init().catch((error) => {
+      console.error(error);
+      setStatus('Не удалось загрузить карту');
+    });
+  </script>
+</body>
+</html>
