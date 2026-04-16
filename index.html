@@ -424,7 +424,7 @@
           ['coltan', 'Колтан'],
           ['wolframite', 'Вольфрамит'],
           ['other', 'Другие ресурсы'],
-          ['interference', 'Белая обводка — зафиксировано вмешательство']
+          ['interference', 'Зафиксировано вмешательство']
         ]
       },
       control: {
@@ -744,8 +744,8 @@
       const n = normalizeMissing(name);
       if (!n) return actorTypeLabel(type, name);
       if (GENERIC_ARMED_NAME_RU[n]) return GENERIC_ARMED_NAME_RU[n];
-      if (n === 'ADF') return 'ADF — иностранная вооруженная группа';
-      if (n === 'FDLR' || n === 'FDLR/Rudi') return 'FDLR — иностранная вооруженная группа';
+      if (n === 'ADF') return 'Альянс демократический сил — угандийская исламистская вооруженная группировка';
+      if (n === 'FDLR' || n === 'FDLR/Rudi') return 'Демократические силы освобождения Руанды — руандийская группировка повстанцев хуту';
       if (n === 'CODECO' || n.trim() === 'CODECO') return 'CODECO — местная вооруженная группа';
       const typeLabel = actorTypeLabel(type, name);
       const category = actorTypeCategory(type, name);
