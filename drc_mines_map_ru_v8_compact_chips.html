@@ -1,0 +1,1215 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Шахты и ресурсы на востоке ДР Конго</title>
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.19.0/dist/maplibre-gl.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0a0a0b;
+      --panel: rgba(22, 22, 24, 0.88);
+      --panel-strong: rgba(18, 18, 20, 0.94);
+      --panel-border: rgba(255, 255, 255, 0.10);
+      --text: #edf5ff;
+      --muted: #9b9ea6;
+      --shadow: 0 20px 52px rgba(0, 0, 0, 0.35);
+      --radius: 18px;
+      --gold: #B08A57;
+      --cassiterite: #6F8FA6;
+      --coltan: #8E79B7;
+      --wolframite: #6C8C6F;
+      --other: #A05A5A;
+      --unknown: #7b7f88;
+      --state: #6F8FA6;
+      --local: #A05A5A;
+      --foreign: #B08A57;
+      --mixed: #7C6FA6;
+      --none: #6f7278;
+      --danger-bg: rgba(109, 52, 52, 0.88);
+      --danger-border: rgba(255,255,255,0.10);
+      --danger-text: #ffffff;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body, #app {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      font-family: "Montserrat", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    body { overflow: hidden; }
+
+    #map {
+      position: absolute;
+      inset: 0;
+      background: #0a0a0b;
+    }
+
+    .maplibregl-ctrl-bottom-right,
+    .maplibregl-ctrl-bottom-left,
+    .maplibregl-ctrl-top-right,
+    .maplibregl-ctrl-top-left {
+      display: none;
+    }
+
+    .panel {
+      position: absolute;
+      z-index: 10;
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: var(--radius);
+      backdrop-filter: blur(14px);
+      box-shadow: var(--shadow);
+    }
+
+    .panel-top {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .panel-toggle,
+    .mode-button {
+      appearance: none;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.06);
+      color: var(--text);
+      font: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      border-radius: 999px;
+      padding: 8px 12px;
+      cursor: pointer;
+      transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+    }
+
+    .panel-toggle:hover,
+    .mode-button:hover {
+      background: rgba(255,255,255,0.10);
+      border-color: rgba(255,255,255,0.18);
+      transform: translateY(-1px);
+    }
+
+    .panel-body { display: block; }
+
+    .info-panel {
+      top: 18px;
+      left: 18px;
+      width: min(430px, calc(100vw - 36px));
+      padding: 14px 16px 14px;
+    }
+
+    .info-panel.is-collapsed {
+      width: auto;
+      padding: 0;
+      background: transparent;
+      border: 0;
+      box-shadow: none;
+      backdrop-filter: none;
+    }
+
+    .info-panel.is-collapsed .panel-top { margin: 0; }
+    .info-panel.is-collapsed .panel-body { display: none; }
+
+    .info-copy {
+      font-size: 13px;
+      line-height: 1.58;
+      color: var(--text);
+      margin: 0;
+    }
+
+    .legend-block {
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .legend-title,
+    .eyebrow,
+    .meta-heading,
+    .chips-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12.5px;
+      line-height: 1.45;
+      color: var(--text);
+    }
+
+    .legend-item + .legend-item { margin-top: 9px; }
+
+    .legend-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 999px;
+      flex: 0 0 auto;
+      border: 1px solid rgba(0,0,0,0.95);
+    }
+
+    .legend-dot--gold { background: var(--gold); }
+    .legend-dot--cassiterite { background: var(--cassiterite); }
+    .legend-dot--coltan { background: var(--coltan); }
+    .legend-dot--wolframite { background: var(--wolframite); }
+    .legend-dot--other { background: var(--other); }
+    .legend-dot--state { background: var(--state); }
+    .legend-dot--local { background: var(--local); }
+    .legend-dot--foreign { background: var(--foreign); }
+    .legend-dot--mixed { background: var(--mixed); }
+    .legend-dot--none { background: var(--none); }
+    .legend-dot--interference {
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.95);
+    }
+
+    .mode-button {
+      margin-top: 14px;
+      width: 100%;
+      text-align: center;
+      padding: 11px 14px;
+    }
+
+    .hover-card {
+      right: 18px;
+      bottom: 18px;
+      width: min(460px, calc(100vw - 36px));
+      max-height: calc(100vh - 36px);
+      padding: 16px 18px;
+      background: var(--panel-strong);
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+
+    .hover-card.is-empty .event-type {
+      opacity: 0.72;
+    }
+    .hover-card::-webkit-scrollbar {
+      width: 10px;
+    }
+
+    .hover-card::-webkit-scrollbar-track {
+      background: rgba(255,255,255,0.05);
+      border-radius: 999px;
+    }
+
+    .hover-card::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.18);
+      border-radius: 999px;
+    }
+
+
+    .event-type {
+      font-size: 18px;
+      font-weight: 700;
+      line-height: 1.24;
+      color: #f6f8fb;
+      margin: 0;
+    }
+
+    .event-type.muted {
+      color: rgba(246,248,251,0.72);
+    }
+
+    .meta-list {
+      margin-top: 14px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .meta-row {
+      display: grid;
+      grid-template-columns: 150px 1fr;
+      gap: 12px;
+    }
+
+    .meta-label {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .meta-value {
+      font-size: 13px;
+      color: var(--text);
+      line-height: 1.45;
+    }
+
+    .section {
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .actor-text {
+      font-size: 13px;
+      line-height: 1.55;
+      color: var(--text);
+      margin: 0;
+    }
+
+    .actor-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+      justify-items: stretch;
+    }
+
+    .actor-card {
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 14px;
+      padding: 10px 11px 9px;
+      background: rgba(255,255,255,0.03);
+      width: 100%;
+      max-width: 100%;
+    }
+
+    .actor-name {
+      min-height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      text-align: left;
+      font-size: 13px;
+      line-height: 1.35;
+      color: #f6f8fb;
+      font-weight: 700;
+      margin: 0;
+    }
+
+    .chips-wrap {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin-top: 3px;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: var(--danger-bg);
+      border: 1px solid var(--danger-border);
+      color: var(--danger-text);
+      font-size: 11px;
+      font-weight: 400;
+      line-height: 1.2;
+      text-align: center;
+      min-height: 31px;
+      max-width: 100%;
+    }
+
+
+    @media (max-width: 520px) {
+      .chips-wrap {
+        gap: 6px;
+      }
+    }
+
+    .status {
+      position: absolute;
+      left: 18px;
+      bottom: 18px;
+      z-index: 12;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: rgba(0,0,0,0.58);
+      border: 1px solid rgba(255,255,255,0.10);
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 700;
+      box-shadow: var(--shadow);
+    }
+
+    .status.is-hidden { display: none; }
+
+    @media (max-width: 900px) {
+      .hover-card {
+        width: min(420px, calc(100vw - 24px));
+        right: 12px;
+        bottom: 12px;
+      }
+      .info-panel {
+        left: 12px;
+        top: 12px;
+        width: min(420px, calc(100vw - 24px));
+      }
+  
+    @media (max-width: 520px) {
+      .chips-wrap {
+        gap: 6px;
+      }
+    }
+
+    .status {
+        left: 12px;
+        bottom: 12px;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .hover-card,
+      .info-panel {
+        width: calc(100vw - 24px);
+      }
+      .hover-card {
+        left: 12px;
+        right: 12px;
+        bottom: 12px;
+      }
+      .meta-row {
+        grid-template-columns: 1fr;
+        gap: 4px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="map"></div>
+
+    <aside id="infoPanel" class="panel info-panel" aria-label="Описание карты">
+      <div class="panel-top">
+        <button id="infoToggle" class="panel-toggle" type="button" aria-expanded="true">Скрыть</button>
+      </div>
+      <div id="infoPanelBody" class="panel-body">
+        <div id="infoCopy" class="info-copy"></div>
+        <div id="legendBlock" class="legend-block"></div>
+        <button id="modeButton" class="mode-button" type="button"></button>
+      </div>
+    </aside>
+
+    <aside id="hoverCard" class="panel hover-card is-empty" aria-live="polite">
+      <div id="hoverCardBody">
+        <div class="event-type muted">Наведите или нажмите на точку</div>
+      </div>
+    </aside>
+
+    <div id="status" class="status">Загрузка данных…</div>
+  </div>
+
+  <script src="https://unpkg.com/maplibre-gl@5.19.0/dist/maplibre-gl.js"></script>
+  <script>
+    const DATA_FILES = {
+      mines: './cod_mines_curated_all_opendata_p_ipis.geojson',
+      provinces: './geoBoundaries-COD-ADM1.geojson'
+    };
+
+    const MODE_CONFIG = {
+      mineral: {
+        info: 'Цвет точки показывает основной ресурс, который добывается на объекте. Размер точки зависит от примерной численности работников. Белая обводка отмечает объекты, где зафиксировано вмешательство или контроль со стороны вооруженных либо силовых акторов.',
+        button: 'Нажмите, если хотите увидеть распределение контроля',
+        legendTitle: 'Что показывает цвет',
+        legend: [
+          ['gold', 'Золото'],
+          ['cassiterite', 'Касситерит'],
+          ['coltan', 'Колтан'],
+          ['wolframite', 'Вольфрамит'],
+          ['other', 'Другие ресурсы'],
+          ['interference', 'Белая обводка — зафиксировано вмешательство']
+        ]
+      },
+      control: {
+        info: 'В этом режиме цвет точки показывает, какие акторы зафиксированы на объекте или вокруг него. Если на одном объекте присутствуют и местные вооруженные группы, и государственные силовые структуры, объект помечен как находящийся под смешанным контролем.',
+        button: 'Вернуться к распределению по ресурсам',
+        legendTitle: 'Кто контролирует или присутствует',
+        legend: [
+          ['local', 'Местные вооруженные группы'],
+          ['foreign', 'Иностранные вооруженные группы'],
+          ['state', 'Государственные силовые структуры'],
+          ['mixed', 'Смешанный контроль'],
+          ['none', 'Контроль не зафиксирован'],
+          ['interference', 'Зафиксировано вмешательство']
+        ]
+      }
+    };
+
+    const PROVINCE_RU = {
+      'Upper Uele': 'Верхнее Уэле',
+      'Haut-Uele': 'Верхнее Уэле',
+      'Lower Uele': 'Нижнее Уэле',
+      'Bas-Uele': 'Нижнее Уэле',
+      'Ituri': 'Итури',
+      'Tshopo': 'Чопо',
+      'Mongala': 'Монгала',
+      'Nord-Ubangi': 'Северное Убанги',
+      'Tshuapa': 'Тшуапа',
+      'Équateur': 'Экватор',
+      'Haut-Katanga': 'Верхняя Катанга',
+      'Haut-Lomami': 'Верхнее Ломами',
+      'Kongo-Central': 'Центральное Конго',
+      'Kwango': 'Кванго',
+      'Sankuru': 'Санкуру',
+      'Sud-Ubangi': 'Южное Убанги',
+      'Tanganyika': 'Танганьика',
+      'Kasai': 'Касаи',
+      'Kasaï': 'Касаи',
+      'Kasai-Oriental': 'Восточный Касаи',
+      'Kasaï-Oriental': 'Восточный Касаи',
+      'Maniema': 'Маниема',
+      'North Kivu': 'Северное Киву',
+      'South Kivu': 'Южное Киву',
+      'Central Kasai': 'Центральный Касаи',
+      'Kasaï-Central': 'Центральный Касаи',
+      'Lomami': 'Ломами',
+      'Lualaba': 'Луалаба',
+      'Kinshasa': 'Киншаса',
+      'Kwilu': 'Квилу',
+      'Mai-Ndombe': 'Маи-Ндомбе',
+      'Nord-Kivu': 'Северное Киву',
+      'Sud-Kivu': 'Южное Киву'
+    };
+
+    const MINERAL_LABELS = {
+      'Or': 'золото',
+      'Cassitérite': 'касситерит',
+      'Coltan': 'колтан',
+      'Wolframite': 'вольфрамит',
+      'Cuivre': 'медь',
+      'Cobalt': 'кобальт',
+      'Diamant': 'алмазы',
+      'Tourmaline': 'турмалин',
+      'Manganèse': 'марганец',
+      'Monazite': 'монацит',
+      'Améthyste': 'аметист',
+      'Saphir': 'сапфир',
+      'Pyrochlore': 'пирохлор',
+      'Minerais mixtes (Cassitérite/Coltan)': 'смешанные руды',
+      'Fer': 'железо',
+      'Bauxite': 'бокситы',
+      'Argent': 'серебро',
+      'Digénite': 'дигенит',
+      'Plomb': 'свинец',
+      'Titanium': 'титан',
+      'Galene': 'галенит',
+      'Charbon': 'уголь',
+      'Zircon': 'циркон',
+      'Quartz': 'кварц',
+      'Niobium': 'ниобий',
+      'Arsénopyrite': 'арсенопирит',
+      'Manvenve': 'манвенве',
+      'inconnu': 'неизвестно'
+    };
+
+    const GENERIC_ARMED_NAME_RU = {
+      'Bandit armé': 'Вооруженные бандиты',
+      'Bandit en arme blanche (Machette)': 'Бандиты с мачете',
+      'Bandits main armée': 'Вооруженные бандиты',
+      'Groupe armé non identifié': 'Неустановленная вооруженная группа',
+      'Groupe de bandits armés': 'Группа вооруженных бандитов',
+      'Groupe de bandits armés non identifiés': 'Неустановленная группа вооруженных бандитов',
+      'Inconnu': 'Неустановленная группа',
+      'Autodéfense': 'Группа самообороны',
+      "Groupe d'autodéfense Zaïre": 'Самооборона Заира',
+      'Autodéfense Zaïre ': 'Самооборона Заира',
+      'Jeunesse Autodéfense Zaïre': 'Молодежная самооборона Заира',
+      'Milice zaïre': 'Заирское ополчение',
+      'Police Nationale Congolaise (sauf PMH)': 'Национальная полиция Конго',
+      'Police des Mines (PMH)': 'Горная полиция',
+      'FARDC': 'Вооруженные силы ДР Конго',
+      'Forces négatives': 'Негосударственные вооруженные силы',
+      'Gardes Parc': 'Смотрители парка',
+      'Les coupeurs de route': 'Дорожные бандиты'
+    };
+
+    const TASK_TRANSLATIONS = [
+      [/^Creuser au surface$/i, 'копают на поверхности'],
+      [/^Creuser à ciel ouvert$/i, 'копают на поверхности'],
+      [/^Creuser sous terre$/i, 'копают под землей'],
+      [/^Creuser dans des puits ou galeries$/i, 'копают в шахтах и галереях'],
+      [/^Creuser$/i, 'копают'],
+      [/^Lavage$/i, 'промывают руду'],
+      [/^Laver$/i, 'промывают руду'],
+      [/^Laver l'or$/i, 'промывают золото'],
+      [/^Concassage$/i, 'дробят руду'],
+      [/^Traiter les déchets$/i, 'перерабатывают отвалы'],
+      [/^Traiter les minerais$/i, 'перерабатывают руду'],
+      [/^Transport des minerais$/i, 'переносят руду'],
+      [/^Transporter les minerais$/i, 'переносят руду'],
+      [/^Transporter$/i, 'переносят руду'],
+      [/^Ramasser les déchets$/i, 'собирают отвалы'],
+      [/^Ramasser.*surface.*broyage\.?$/i, 'собирают руду на поверхности'],
+      [/^Ramasser.*surface$/i, 'собирают руду на поверхности'],
+      [/^Ramasser.*pierres.*$/i, 'собирают руду на поверхности'],
+      [/^Ramasser.*minerais.*$/i, 'собирают руду на поверхности'],
+      [/^Usage du mercure$/i, 'используют ртуть'],
+      [/^Vendre$/i, 'продают минералы'],
+      [/^Vente de l'or$/i, 'продают золото'],
+      [/^Commerce de minerais$/i, 'торгуют минералами'],
+      [/^Boutique$/i, 'занимаются мелкой торговлей'],
+      [/^Petit commerce$/i, 'занимаются мелкой торговлей'],
+      [/^petit commerce$/i, 'занимаются мелкой торговлей'],
+      [/^Restauration$/i, 'готовят еду'],
+      [/^Restaurant$/i, 'готовят еду'],
+      [/^Préparer la nourriture.*$/i, 'готовят еду'],
+      [/^Preparent la nourriture.*$/i, 'готовят еду'],
+      [/^Cuisinent.*$/i, 'готовят еду'],
+      [/^Apporter.*nourriture.*$/i, 'приносят еду'],
+      [/^Tâches ménagères.*$/i, 'занимаются домашней работой'],
+      [/^Travaux champêtres$/i, 'работают в поле'],
+      [/^travaux champêtres$/i, 'работают в поле'],
+      [/^Transporter de l'eau$/i, 'носят воду'],
+      [/^Prostitution\.?$/i, 'занимаются секс-работой'],
+      [/^prostitution\.?$/i, 'занимаются секс-работой'],
+      [/^Plongeur$/i, 'работают в затопленных выработках'],
+      [/^Prospection$/i, 'занимаются поиском руды']
+    ];
+
+    const ACTION_LABELS = {
+      taxation: 'Облагают налогом добычу',
+      commerce_taxation: 'Облагают налогом торговлю',
+      entrance_taxation: 'Берут плату за вход на объект',
+      monopoly: 'Монополия на сбыт',
+      buying_minerals: 'Покупают минералы',
+      digging: 'Участвуют в добыче',
+      forced_labour: 'Используют принудительный труд',
+      pillaging: 'Занимаются грабежом',
+      pit_ownership: 'Контролируют отдельные выработки на объекте'
+    };
+
+    const COLORS = {
+      mineral: {
+        gold: '#B08A57',
+        cassiterite: '#6F8FA6',
+        coltan: '#8E79B7',
+        wolframite: '#6C8C6F',
+        other: '#A05A5A',
+        unknown: '#7b7f88'
+      },
+      control: {
+        state: '#6F8FA6',
+        local: '#A05A5A',
+        foreign: '#B08A57',
+        mixed: '#7C6FA6',
+        none: '#6f7278'
+      }
+    };
+
+    const state = {
+      mode: 'mineral',
+      hoverId: null,
+      lockedId: null,
+      featureById: new Map()
+    };
+
+    const hoverCard = document.getElementById('hoverCard');
+    const hoverCardBody = document.getElementById('hoverCardBody');
+    const statusEl = document.getElementById('status');
+    const infoPanel = document.getElementById('infoPanel');
+    const infoToggle = document.getElementById('infoToggle');
+    const infoCopy = document.getElementById('infoCopy');
+    const legendBlock = document.getElementById('legendBlock');
+    const modeButton = document.getElementById('modeButton');
+
+    let map;
+
+    function setStatus(message, hide = false) {
+      statusEl.textContent = message;
+      statusEl.classList.toggle('is-hidden', hide);
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+    }
+
+    function formatNumber(value) {
+      const n = Number(value);
+      return Number.isFinite(n) ? new Intl.NumberFormat('ru-RU').format(n) : 'Не указано';
+    }
+
+    function yesNoUnknown(value, yesWord = 'Есть') {
+      if (value === 1 || value === '1' || value === true) return yesWord;
+      if (value === 0 || value === '0' || value === false) return 'Нет';
+      return 'Не указано';
+    }
+
+    function normalizeString(value) {
+      if (value === null || value === undefined) return null;
+      const s = String(value).trim();
+      if (!s || s === 'None' || s === 'null') return null;
+      return s;
+    }
+
+    function normalizeMissing(value) {
+      const s = normalizeString(value);
+      if (!s) return null;
+      if (/^(aucun|inconnu|je ne sais pas)$/i.test(s)) return null;
+      return s;
+    }
+
+    function capitalizeSentence(value) {
+      const s = normalizeString(value);
+      if (!s) return '';
+      return s.charAt(0).toUpperCase() + s.slice(1);
+    }
+
+    function translateProvince(value) {
+      const s = normalizeString(value);
+      return s ? (PROVINCE_RU[s] || s) : 'Не указано';
+    }
+
+    function translateMineral(value) {
+      const s = normalizeMissing(value);
+      if (!s) return null;
+      return MINERAL_LABELS[s] || s.toLowerCase();
+    }
+
+    function dedupe(items) {
+      const out = [];
+      const seen = new Set();
+      for (const item of items) {
+        if (!item) continue;
+        const key = item.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push(item);
+      }
+      return out;
+    }
+
+    function mineralsList(props) {
+      return dedupe([
+        translateMineral(props.mineral1),
+        translateMineral(props.mineral2),
+        translateMineral(props.mineral3)
+      ]);
+    }
+
+    function joinRuList(items) {
+      if (!items.length) return 'минералы';
+      if (items.length === 1) return items[0];
+      if (items.length === 2) return `${items[0]} и ${items[1]}`;
+      return `${items.slice(0, -1).join(', ')} и ${items[items.length - 1]}`;
+    }
+
+    function buildTitle(props) {
+      const minerals = mineralsList(props);
+      return `Здесь добывают ${joinRuList(minerals)}`;
+    }
+
+    function mineralCategory(props) {
+      const primary = translateMineral(props.mineral1);
+      if (!primary) return 'unknown';
+      if (primary === 'золото') return 'gold';
+      if (primary === 'касситерит') return 'cassiterite';
+      if (primary === 'колтан') return 'coltan';
+      if (primary === 'вольфрамит') return 'wolframite';
+      return 'other';
+    }
+
+    function actorTypeCategory(type, name) {
+      const t = normalizeMissing(type) || '';
+      const n = normalizeMissing(name) || '';
+      if (t === 'Groupe armé local') return 'local';
+      if (t === 'Groupe armé étranger') return 'foreign';
+      if (t.startsWith('FARDC') || t.startsWith('PNC') || t.startsWith('PMH')) return 'state';
+      if (n === 'FARDC' || n === 'Police Nationale Congolaise (sauf PMH)' || n === 'Police des Mines (PMH)') return 'state';
+      return null;
+    }
+
+    function actorTypeLabel(type, name) {
+      const category = actorTypeCategory(type, name);
+      if (category === 'local') return 'местная вооруженная группа';
+      if (category === 'foreign') return 'иностранная вооруженная группа';
+      if (normalizeString(type)?.startsWith('FARDC')) return 'Вооруженные силы ДР Конго';
+      if (normalizeString(type)?.startsWith('PNC')) return 'Национальная полиция Конго';
+      if (normalizeString(type)?.startsWith('PMH')) return 'Горная полиция';
+      return null;
+    }
+
+    function translateActorName(name, type) {
+      const n = normalizeMissing(name);
+      if (!n) return actorTypeLabel(type, name);
+      if (GENERIC_ARMED_NAME_RU[n]) return GENERIC_ARMED_NAME_RU[n];
+      if (n === 'ADF') return 'ADF — иностранная вооруженная группа';
+      if (n === 'FDLR' || n === 'FDLR/Rudi') return 'FDLR — иностранная вооруженная группа';
+      if (n === 'CODECO' || n.trim() === 'CODECO') return 'CODECO — местная вооруженная группа';
+      const typeLabel = actorTypeLabel(type, name);
+      const category = actorTypeCategory(type, name);
+      if (category === 'local') return `«${n}» — местная вооруженная группа`;
+      if (category === 'foreign') return `«${n}» — иностранная вооруженная группа`;
+      if (typeLabel && typeLabel !== 'Вооруженные силы ДР Конго' && typeLabel !== 'Национальная полиция Конго' && typeLabel !== 'Горная полиция') {
+        return `${n} — ${typeLabel}`;
+      }
+      return n;
+    }
+
+    function actionsForActor(props, idx) {
+      const keys = ['taxation', 'commerce_taxation', 'entrance_taxation', 'monopoly', 'buying_minerals', 'digging', 'forced_labour', 'pillaging', 'pit_ownership'];
+      return keys.filter((key) => Number(props[`${key}_armed_group${idx}`]) === 1).map((key) => ACTION_LABELS[key]);
+    }
+
+    function buildActors(props) {
+      const actors = [];
+      for (let i = 1; i <= 3; i += 1) {
+        const rawType = normalizeMissing(props[`type_armed_group${i}`]);
+        const rawName = normalizeMissing(props[`armed_group${i}`]);
+        if (!rawType && !rawName) continue;
+        if (rawType === 'Aucun') continue;
+        const label = translateActorName(rawName, rawType);
+        if (!label) continue;
+        actors.push({
+          label,
+          typeCategory: actorTypeCategory(rawType, rawName),
+          actions: actionsForActor(props, i)
+        });
+      }
+      const deduped = [];
+      const seen = new Set();
+      for (const actor of actors) {
+        const key = actor.label + '|' + actor.actions.join('|');
+        if (seen.has(key)) continue;
+        seen.add(key);
+        deduped.push(actor);
+      }
+      return deduped;
+    }
+
+    function controlCategory(props) {
+      const actors = buildActors(props);
+      if (!actors.length) return 'none';
+      const categories = new Set(actors.map((actor) => actor.typeCategory).filter(Boolean));
+      if (!categories.size) return 'none';
+      if (categories.size > 1) return 'mixed';
+      return [...categories][0] || 'none';
+    }
+
+    function translateTaskSegment(segment) {
+      const s = normalizeMissing(segment);
+      if (!s) return null;
+      for (const [regex, ru] of TASK_TRANSLATIONS) {
+        if (regex.test(s)) return ru;
+      }
+      return null;
+    }
+
+    function translateTaskList(value) {
+      const raw = normalizeMissing(value);
+      if (!raw) return 'Не указано';
+      const translated = dedupe(raw.split(',').map((part) => translateTaskSegment(part.trim())).filter(Boolean));
+      if (!translated.length) return 'Не указано';
+      const joined = translated.join(', ');
+      return joined.charAt(0).toUpperCase() + joined.slice(1);
+    }
+
+    function safeText(value) {
+      const s = normalizeMissing(value);
+      return s ? capitalizeSentence(s) : 'Не указано';
+    }
+
+    function circleRadiusExpression() {
+      return [
+        'interpolate', ['linear'], ['coalesce', ['to-number', ['get', 'workers_numb']], 0],
+        0, 4,
+        5, 4.5,
+        20, 5.5,
+        50, 7,
+        100, 8.5,
+        250, 10.5,
+        500, 12.5,
+        1000, 15.5,
+        2500, 19
+      ];
+    }
+
+    function highlightRadiusExpression() {
+      return [
+        'interpolate', ['linear'], ['coalesce', ['to-number', ['get', 'workers_numb']], 0],
+        0, 8,
+        5, 8.5,
+        20, 9.5,
+        50, 11,
+        100, 13,
+        250, 15,
+        500, 17,
+        1000, 20,
+        2500, 24
+      ];
+    }
+
+    function strokeColorExpression() {
+      return ['case', ['==', ['get', '__has_interference'], 1], '#ffffff', '#0a0a0b'];
+    }
+
+    function colorExpression(mode) {
+      const prop = mode === 'control' ? '__control_cat' : '__mineral_cat';
+      const palette = mode === 'control' ? COLORS.control : COLORS.mineral;
+      return [
+        'match', ['get', prop],
+        ...Object.entries(palette).flat(),
+        mode === 'control' ? COLORS.control.none : COLORS.mineral.unknown
+      ];
+    }
+
+    function buildGeoBounds(geojson) {
+      const bounds = new maplibregl.LngLatBounds();
+      geojson.features.forEach((feature) => {
+        const geom = feature.geometry;
+        const parts = geom.type === 'Polygon' ? [geom.coordinates] : geom.coordinates;
+        parts.forEach((poly) => poly.forEach((ring) => ring.forEach(([lng, lat]) => bounds.extend([lng, lat]))));
+      });
+      return bounds;
+    }
+
+    function renderLegend() {
+      const cfg = MODE_CONFIG[state.mode];
+      infoCopy.textContent = cfg.info;
+      legendBlock.innerHTML = `
+        <div class="legend-title">${escapeHtml(cfg.legendTitle)}</div>
+        ${cfg.legend.map(([key, label]) => `
+          <div class="legend-item">
+            <span class="legend-dot legend-dot--${escapeHtml(key)}"></span>
+            <span>${escapeHtml(label)}</span>
+          </div>`).join('')}
+      `;
+      modeButton.textContent = cfg.button;
+    }
+
+    function createMap() {
+      map = new maplibregl.Map({
+        container: 'map',
+        attributionControl: false,
+        dragRotate: false,
+        touchZoomRotate: true,
+        style: {
+          version: 8,
+          glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+          sources: {
+            carto: {
+              type: 'raster',
+              tiles: [
+                'https://a.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',
+                'https://b.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',
+                'https://c.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',
+                'https://d.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png'
+              ],
+              tileSize: 256,
+              attribution: '© OpenStreetMap, © CARTO'
+            }
+          },
+          layers: [
+            { id: 'bg', type: 'background', paint: { 'background-color': '#0a0a0b' } },
+            { id: 'carto', type: 'raster', source: 'carto', minzoom: 0, maxzoom: 18 }
+          ]
+        }
+      });
+    }
+
+    function installSources(provincesGeoJSON, minesGeoJSON) {
+      map.addSource('provinces', { type: 'geojson', data: provincesGeoJSON });
+      map.addSource('mines', { type: 'geojson', data: minesGeoJSON, promoteId: '__id' });
+      map.addSource('active-mine', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] }
+      });
+    }
+
+    function installLayers() {
+      map.addLayer({
+        id: 'provinces-fill',
+        type: 'fill',
+        source: 'provinces',
+        paint: {
+          'fill-color': 'rgba(255,255,255,0.01)',
+          'fill-opacity': 1
+        }
+      });
+
+      map.addLayer({
+        id: 'provinces-outline',
+        type: 'line',
+        source: 'provinces',
+        paint: {
+          'line-color': 'rgba(220,226,235,0.24)',
+          'line-width': [
+            'interpolate', ['linear'], ['zoom'],
+            4, 0.7,
+            6, 1,
+            8, 1.3
+          ],
+          'line-opacity': 0.88
+        }
+      });
+
+      map.addLayer({
+        id: 'provinces-label',
+        type: 'symbol',
+        source: 'provinces',
+        minzoom: 5,
+        layout: {
+          'text-field': ['get', 'shapeNameRu'],
+          'text-font': ['Open Sans Semibold'],
+          'text-size': ['interpolate', ['linear'], ['zoom'], 5, 10, 7, 11.5, 9, 13],
+          'text-max-width': 8,
+          'text-allow-overlap': false,
+          'text-ignore-placement': false
+        },
+        paint: {
+          'text-color': 'rgba(210,217,226,0.48)',
+          'text-halo-color': 'rgba(10,10,11,0.94)',
+          'text-halo-width': 1.2
+        }
+      });
+
+      map.addLayer({
+        id: 'mines-layer',
+        type: 'circle',
+        source: 'mines',
+        paint: {
+          'circle-color': colorExpression(state.mode),
+          'circle-radius': circleRadiusExpression(),
+          'circle-opacity': 0.9,
+          'circle-stroke-color': strokeColorExpression(),
+          'circle-stroke-width': 1
+        }
+      });
+
+      map.addLayer({
+        id: 'active-mine-layer',
+        type: 'circle',
+        source: 'active-mine',
+        paint: {
+          'circle-color': colorExpression(state.mode),
+          'circle-opacity': 0.18,
+          'circle-radius': highlightRadiusExpression(),
+          'circle-stroke-color': '#ffffff',
+          'circle-stroke-width': 1.8
+        }
+      });
+    }
+
+    function updateMode() {
+      renderLegend();
+      if (!map || !map.getLayer('mines-layer') || !map.getLayer('active-mine-layer')) return;
+      map.setPaintProperty('mines-layer', 'circle-color', colorExpression(state.mode));
+      map.setPaintProperty('active-mine-layer', 'circle-color', colorExpression(state.mode));
+    }
+
+    function setActiveFeature(feature) {
+      const data = feature ? { type: 'FeatureCollection', features: [feature] } : { type: 'FeatureCollection', features: [] };
+      map.getSource('active-mine').setData(data);
+    }
+
+    function renderEmptyCard() {
+      hoverCard.classList.add('is-empty');
+      hoverCardBody.innerHTML = '<div class="event-type muted">Наведите или нажмите на точку</div>';
+    }
+
+    function metaRow(label, value) {
+      return `
+        <div class="meta-row">
+          <div class="meta-label">${escapeHtml(label)}</div>
+          <div class="meta-value">${escapeHtml(value)}</div>
+        </div>`;
+    }
+
+    function actorSection(props) {
+      const presence = Number(props.presence) === 1;
+      const interference = Number(props.interference) === 1;
+      const actors = buildActors(props);
+
+      let text = 'Присутствие вооруженных или силовых акторов на объекте не зафиксировано.';
+      if (interference) {
+        text = 'Зафиксировано вмешательство или контроль со стороны вооруженных или силовых акторов.';
+      } else if (presence) {
+        text = 'Присутствие вооруженных или силовых акторов зафиксировано, но вмешательство на объекте не отмечено.';
+      }
+
+      const actorCards = actors.length ? `
+        <div class="actor-list">
+          ${actors.map((actor) => `
+            <div class="actor-card">
+              <div class="actor-name">${escapeHtml(capitalizeSentence(actor.label))}</div>
+              ${actor.actions.length ? `
+                <div class="chips-wrap">
+                  ${actor.actions.map((action) => `<span class="chip">${escapeHtml(action)}</span>`).join('')}
+                </div>` : ''}
+            </div>`).join('')}
+        </div>` : '';
+
+      return `
+        <div class="section">
+          <div class="meta-heading">Вооруженные и силовые акторы</div>
+          <p class="actor-text">${escapeHtml(text)}</p>
+          ${actorCards}
+        </div>`;
+    }
+
+    function renderFeatureCard(feature) {
+      if (!feature) {
+        renderEmptyCard();
+        return;
+      }
+
+      const props = feature.properties;
+      hoverCard.classList.remove('is-empty');
+
+      hoverCardBody.innerHTML = `
+        <div class="event-type">${escapeHtml(buildTitle(props))}</div>
+        <div class="meta-list">
+          ${metaRow('Провинция', translateProvince(props.province))}
+          ${metaRow('Число работников', formatNumber(props.workers_numb))}
+          ${metaRow('Женщины на объекте', yesNoUnknown(props.women, 'Есть'))}
+          ${metaRow('Дети до 15 лет на объекте', yesNoUnknown(props.childunder15, 'Есть'))}
+          ${metaRow('Что делают женщины', translateTaskList(props.womenwork))}
+          ${metaRow('Что делают дети', translateTaskList(props.childunder15work))}
+          ${metaRow('Используется ртуть', yesNoUnknown(props.mercury, 'Да'))}
+        </div>
+        ${actorSection(props)}
+      `;
+    }
+
+    function eventFeatureAtPoint(point) {
+      return map.queryRenderedFeatures(point, { layers: ['mines-layer'] })[0] || null;
+    }
+
+    function updateActiveFromId(id) {
+      const feature = id !== null ? state.featureById.get(id) : null;
+      setActiveFeature(feature || null);
+      renderFeatureCard(feature || null);
+    }
+
+    function setHover(id) {
+      if (state.hoverId === id) return;
+      state.hoverId = id;
+      updateActiveFromId(state.lockedId ?? state.hoverId);
+    }
+
+    function clearHover() {
+      if (state.hoverId === null) return;
+      state.hoverId = null;
+      updateActiveFromId(state.lockedId ?? null);
+    }
+
+    function setLocked(id) {
+      state.lockedId = id;
+      updateActiveFromId(id);
+    }
+
+    function clearLocked() {
+      if (state.lockedId === null) return;
+      state.lockedId = null;
+      updateActiveFromId(state.hoverId ?? null);
+    }
+
+    function installInteractions() {
+      map.on('mousemove', 'mines-layer', (e) => {
+        map.getCanvas().style.cursor = 'pointer';
+        if (state.lockedId !== null) return;
+        const feature = e.features && e.features[0];
+        if (feature) setHover(feature.id);
+      });
+
+      map.on('mouseleave', 'mines-layer', () => {
+        map.getCanvas().style.cursor = '';
+        if (state.lockedId !== null) return;
+        clearHover();
+      });
+
+      map.on('click', (e) => {
+        const feature = eventFeatureAtPoint(e.point);
+        if (feature) {
+          setLocked(feature.id);
+          map.getCanvas().style.cursor = 'pointer';
+        } else {
+          clearLocked();
+          clearHover();
+          map.getCanvas().style.cursor = '';
+        }
+      });
+    }
+
+    function installPanelActions() {
+      infoToggle.addEventListener('click', () => {
+        const collapsed = infoPanel.classList.toggle('is-collapsed');
+        infoToggle.textContent = collapsed ? 'Показать' : 'Скрыть';
+        infoToggle.setAttribute('aria-expanded', String(!collapsed));
+      });
+
+      modeButton.addEventListener('click', () => {
+        state.mode = state.mode === 'mineral' ? 'control' : 'mineral';
+        updateMode();
+      });
+    }
+
+    function preprocessProvinces(geojson) {
+      geojson.features.forEach((feature) => {
+        feature.properties.shapeNameRu = translateProvince(feature.properties.shapeName);
+      });
+      return geojson;
+    }
+
+    function preprocessMines(geojson) {
+      geojson.features.forEach((feature, index) => {
+        feature.id = index;
+        feature.properties.__id = index;
+        feature.properties.__mineral_cat = mineralCategory(feature.properties);
+        feature.properties.__control_cat = controlCategory(feature.properties);
+        feature.properties.__has_interference = Number(feature.properties.interference) === 1 ? 1 : 0;
+        state.featureById.set(index, feature);
+      });
+      return geojson;
+    }
+
+    async function init() {
+      setStatus('Загрузка данных…');
+      const [provincesRaw, minesRaw] = await Promise.all([
+        fetch(DATA_FILES.provinces).then((r) => r.json()),
+        fetch(DATA_FILES.mines).then((r) => r.json())
+      ]);
+
+      const provincesGeoJSON = preprocessProvinces(provincesRaw);
+      const minesGeoJSON = preprocessMines(minesRaw);
+
+      createMap();
+      installPanelActions();
+      renderLegend();
+
+      map.on('load', () => {
+        installSources(provincesGeoJSON, minesGeoJSON);
+        installLayers();
+        installInteractions();
+        updateMode();
+
+        const bounds = buildGeoBounds(provincesGeoJSON);
+        map.fitBounds(bounds, {
+          padding: { top: 70, right: 70, bottom: 70, left: 70 },
+          duration: 0,
+          maxZoom: 8
+        });
+
+        renderEmptyCard();
+        setStatus('Готово', true);
+      });
+    }
+
+    init().catch((error) => {
+      console.error(error);
+      setStatus('Не удалось загрузить карту');
+    });
+  </script>
+</body>
+</html>
